@@ -12,7 +12,6 @@
 # define ASCII_a 97
 # define ASCII_0 48
 
-static const char *FILES = "abcdefgh";
 /**
  * Types of chess pieces:
  *  0x0 000 King.castle:    (in check, not in check)    1 bit   0=false
@@ -46,27 +45,27 @@ static const char *FILES = "abcdefgh";
 # define KING           0b000 //0x0
 # define CASTLED_KING   0b001 //0x1
 
-# define W_R_C  PIECE | WHITE | ROOK | 1
-# define W_R    PIECE | WHITE | ROOK
-# define W_N    PIECE | WHITE | KNIGHT
-# define W_B_L  PIECE | WHITE | BISHOP
-# define W_B_D  PIECE | WHITE | BISHOP | 1
-# define W_Q    PIECE | WHITE | QUEEN
-# define W_K_C  PIECE | WHITE | KING
-# define W_K    PIECE | WHITE | CASTLED_KING
-# define W_P    PIECE | WHITE | PAWN
-# define W_P_E  PIECE | WHITE | PAWN | 1
+# define W_R_C  PIECE | WHITE | (ROOK << 1)     | 1
+# define W_R    PIECE | WHITE | (ROOK << 1)
+# define W_N    PIECE | WHITE | (KNIGHT << 1)
+# define W_B_L  PIECE | WHITE | (BISHOP << 1)
+# define W_B_D  PIECE | WHITE | (BISHOP << 1)   | 1
+# define W_Q    PIECE | WHITE | (QUEEN << 1)
+# define W_K_C  PIECE | WHITE | (KING << 1)
+# define W_K    PIECE | WHITE | (CASTLED_KING << 1)
+# define W_P    PIECE | WHITE | (PAWN << 1)
+# define W_P_E  PIECE | WHITE | (PAWN << 1)     | 1
 
-# define B_R_C  PIECE | BLACK | ROOK | 1
-# define B_R    PIECE | BLACK | ROOK
-# define B_N    PIECE | BLACK | KNIGHT
-# define B_B_L  PIECE | BLACK | BISHOP
-# define B_B_D  PIECE | BLACK | BISHOP | 1
-# define B_Q    PIECE | BLACK | QUEEN
-# define B_K_C  PIECE | BLACK | KING
-# define B_K    PIECE | BLACK | CASTLED_KING
-# define B_P    PIECE | BLACK | PAWN
-# define B_P_E  PIECE | BLACK | PAWN | 1
+# define B_R_C  PIECE | BLACK | (ROOK << 1)     | 1
+# define B_R    PIECE | BLACK | (ROOK << 1)
+# define B_N    PIECE | BLACK | (KNIGHT << 1)
+# define B_B_L  PIECE | BLACK | (BISHOP << 1)
+# define B_B_D  PIECE | BLACK | (BISHOP << 1)   | 1
+# define B_Q    PIECE | BLACK | (QUEEN << 1)
+# define B_K_C  PIECE | BLACK | (KING << 1)
+# define B_K    PIECE | BLACK | (CASTLED_KING << 1)
+# define B_P    PIECE | BLACK | (PAWN << 1)
+# define B_P_E  PIECE | BLACK | (PAWN << 1)     | 1
 
 /*
 # define W_R_C  0b10001011  //white rook, can be castled
@@ -90,13 +89,15 @@ static const char *FILES = "abcdefgh";
 # define B_K    0b11000010  //black kind, can't be castled
 # define B_P    0b11001110  //black pawn
 # define B_P_E  0b11001111  //black pawn, can be captured e.p.
-*/
+//*/
 
 # define EMPTY  0b00000000
 
 
 void board(void);
 void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateChange[BOARD_SIZE]);
+void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]);
+void printLogicalBoard(uint8_t logical[BOARD_SIZE]);
 
 int main(int argc, char *argv[]){
     board();
@@ -142,6 +143,8 @@ void board(void) {
     };
 
     getMove(full, stateChangeTest);
+    // printFullBoard(full);
+    // printLogicalBoard(stateChangeTest);
 };
 
 /**
@@ -154,9 +157,9 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
      * and the 4 LSBs representing the file (A,B,C,...). 
      * Since only 3 bits are needed to represent a range of 8, the highest is always 0, i.e:
      *      0010 0111
-     *      |    |_____ 0111 = 7 --> 8 (0..7 maps to 1..8)
-     *      |__________ 0010 = 2 --> b (0..7 maps to A..B)
-     * Which means 00100111 represents the square B8.
+     *      |    |_____ 0111 = 7 --> 8 (0..7 maps to 1..8) rank
+     *      |__________ 0010 = 2 --> b (0..7 maps to A..B) file
+     * Which means 00100111 represents the square b8.
      * 
      * Also, the most squares which can participate in a move is 4, for castling, so we only need an array of size 4.
      */
@@ -168,16 +171,17 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
     uint8_t pieces[4] = {0, 0, 0, 0}; //initialised to 0 representing an empty square
     uint8_t found = 0; //number of active squares found
     // 1. find coordinates of logical state change squares
-    for (int rank = 0; rank < BOARD_SIZE; rank++) {
-        for (int file = 0; file < BOARD_SIZE; file++) {
+    for (uint8_t rank = 0; rank < BOARD_SIZE; rank++) {
+        for (uint8_t file = 0; file < BOARD_SIZE; file++) {
             if ( logicalStateChange[rank] & (1 << file) ) { //if there is a piece on the square
-                squares[found] = file + ( rank << 4 ); //set to the binary representation outlined above
+                squares[found] = rank + ( file << 4 ); //set to the binary representation outlined above
                 uint8_t contents = boardState[rank][file]; //i swear you couldn't pass 2d arrays like this wtf
-                if (contents != EMPTY) { //if empty, don't need to do anything
+                if (contents & PIECE) { //if the square isn't empty, the MSB will be set to 1
                     pieces[found] = 1 << 7  | ( (contents & M_PIECE) >> 1 );
                     //..............|...........|______________________________ get the piece id and shift to LSBs
                     //...............\_________________________________________ MSB set high for piece id
                 }
+                printf("Piece %d at rank:%d file:%d\n", pieces[found]&0xf, rank, file);
                 found++;
             };
         };
@@ -193,9 +197,9 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
         if ( !(pieces[1] && pieces[2]) ) {
     // 4. get the piece type of the non-empty square used
             if (pieces[0]) {
-                pieceBuffer = ( pieces[0] & ~PIECE ) >> 1 | 0 << 4; //clear the piece flag and get the piece id, then set the index
+                pieceBuffer = ( pieces[0] & !PIECE ) >> 1 | 0 << 4; //clear the piece flag and get the piece id, then set the index
             } else if (pieces[1]) {
-                pieceBuffer = ( pieces[1] & ~PIECE ) >> 1 | 1 << 4; //same as above, but this time the index is non-zero
+                pieceBuffer = ( pieces[1] & !PIECE ) >> 1 | 1 << 4; //same as above, but this time the index is non-zero
             };
     // 5. form a move made
             switch (pieceBuffer & 0xf) { //select the LSBs
@@ -238,3 +242,32 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
 
     printf("%s", moveString);
 };
+
+
+void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
+    char *white = "KKQBNR-P";
+    char *black = "kkqbnr-p";
+    for (int8_t rank = BOARD_SIZE-1; rank >= 0; rank--) { //start at the borrom because we need to print black first
+        for (int8_t file = 0; file < BOARD_SIZE; file++){
+            if (board[rank][file] & PIECE) {
+                if (board[rank][file] & BLACK) {
+                    printf("%c ", black[(board[rank][file] & M_PIECE) >> 1] );
+                } else {
+                    printf("%c ", white[(board[rank][file] & M_PIECE) >> 1] );
+                }
+            } else {
+                printf(". ");
+            }
+        };
+        printf("\n");
+    };
+}
+
+void printLogicalBoard(uint8_t logical[BOARD_SIZE]) {
+    for (int8_t rank = BOARD_SIZE-1; rank >= 0; rank--) { //start at the borrom because we need to print black first
+        for (int8_t file = 0; file < BOARD_SIZE; file++){
+            printf("%d ", (logical[rank] >> file) & 1);
+        };
+        printf("\n");
+    };
+}
