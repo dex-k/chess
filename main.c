@@ -138,13 +138,13 @@ void board(void) {
     };
 
     static uint8_t stateChangeTest[8] = {
-        0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0 //should be 1...a7
-        //0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //should be 1.Na3
+        // 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0 //should be 1...a7
+        0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //should be 1.Na3
     };
 
+    printFullBoard(full);
+    printLogicalBoard(stateChangeTest);
     getMove(full, stateChangeTest);
-    // printFullBoard(full);
-    // printLogicalBoard(stateChangeTest);
 };
 
 /**
@@ -173,23 +173,26 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
     // 1. find coordinates of logical state change squares
     for (uint8_t rank = 0; rank < BOARD_SIZE; rank++) {
         for (uint8_t file = 0; file < BOARD_SIZE; file++) {
-            if ( logicalStateChange[rank] & (1 << file) ) { //if there is a piece on the square
+            if ( logicalStateChange[rank] & (1 << file) ) { //if the square was part of a move
                 squares[found] = rank + ( file << 4 ); //set to the binary representation outlined above
                 uint8_t contents = boardState[rank][file]; //i swear you couldn't pass 2d arrays like this wtf
                 if (contents & PIECE) { //if the square isn't empty, the MSB will be set to 1
                     pieces[found] = 1 << 7  | ( (contents & M_PIECE) >> 1 );
                     //..............|...........|______________________________ get the piece id and shift to LSBs
                     //...............\_________________________________________ MSB set high for piece id
+
+                    printf("Piece %x at %c%c (%d,%d)\n", pieces[found]&0xf, ASCII_a+file, ASCII_0+rank+1,rank,file);
+                } else {
+                    printf("Empty at %c%c (%d,%d)\n", ASCII_a+file, ASCII_0+rank+1,rank,file);
                 }
-                printf("Piece %d at rank:%d file:%d\n", pieces[found]&0xf, rank, file);
                 found++;
             };
         };
     };
     // 4 LSBs store the piece type, 4 MSBs store the id of the square in squares[] array
     uint8_t pieceBuffer = 0;
-    char moveString[7+1]; // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
-    char charBuffer[1+1]; // general purpose buffer for handinling single characters
+    char moveString[7+1] = ""; // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
+    char charBuffer[1+1] = ""; // general purpose buffer for handinling single characters
 
     // 2. verify that theres only 2
     if (found == 2) {
@@ -197,24 +200,27 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
         if ( !(pieces[1] && pieces[2]) ) {
     // 4. get the piece type of the non-empty square used
             if (pieces[0]) {
-                pieceBuffer = ( pieces[0] & !PIECE ) >> 1 | 0 << 4; //clear the piece flag and get the piece id, then set the index
+                pieceBuffer = (pieces[0] & 0xf) | 0<<4; //piece id stored in 3 LSBs, so select them, then add the index (0) in MSBs
             } else if (pieces[1]) {
-                pieceBuffer = ( pieces[1] & !PIECE ) >> 1 | 1 << 4; //same as above, but this time the index is non-zero
+                pieceBuffer = (pieces[1] & 0xf) | 1<<4; //same as above, but the index placed in MSBs is nonzero
             };
     // 5. form a move made
-            switch (pieceBuffer & 0xf) { //select the LSBs
+            switch (pieceBuffer & 0xf) { //piece id stored in 4 LSBs
                 case PAWN:
+                    printf("Pawn move from %c%c\n", ASCII_a + (squares[pieceBuffer >> 4]>>4), ASCII_0 + 1 + (squares[(pieceBuffer >> 4)]&0xf));
                     /*//Nothing gets added for a pawn move, but this code is needed for pawn captures
                     snprintf(charBuffer, 1, "%d", ASCII_a + squares[1 - (pieceBuffer >> 4)]);
                     strncpy(moveString, charBuffer, 1); //1-x selects the other piece (since there's
                     // ... only 2 pieces maximum in this case), then extracts the index and used that to get the file (>>4 for MSBs)
                     */
+                    // strncpy(moveString, "", 1);
                 break;
                 case ROOK:
                     //!!!TODO check for conflicts here to see if specifying which piece is needed
                     strncpy(moveString, "R", 1);
                 break;
                 case KNIGHT:
+                    printf("Knight move from %c%c\n", ASCII_a + (squares[pieceBuffer >> 4]>>4), ASCII_0 + 1 + (squares[(pieceBuffer >> 4)]&0xf));
                     //!!!TODO check for conflicts here to see if specifying which piece is needed
                     strncpy(moveString, "N", 1);
                 break;
@@ -230,11 +236,17 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
                     strncpy(moveString, "K", 1);
                 break;
             };
-
-            snprintf(charBuffer, 1, "%d", ASCII_a + squares[pieceBuffer >> 4]); // extract the file from squares
-            strncat(moveString, charBuffer, 1);// add alpha component
-
-            snprintf(charBuffer, 1, "%d", ASCII_0 + 1 + squares[(pieceBuffer >> 4)]); // extract rank from squares
+            if ( !strcmp(moveString, "") ) { //if empty i.e. pawn move made
+                printf("pawm move empty str\n");
+                snprintf(charBuffer, 1, "%c", ASCII_a + (squares[pieceBuffer >> 4] >> 4) ); // extract the file from squares
+                strncpy(moveString, charBuffer, 1);// add alpha component
+            } else {
+                printf("non empty movestring\n");
+                snprintf(charBuffer, 1, "%c", ASCII_a + (squares[pieceBuffer >> 4] >> 4) ); // extract the file from squares
+                strncat(moveString, charBuffer, 1);// add alpha component
+            }
+            // *charBuffer = 0;
+            snprintf(charBuffer, 1, "%c", ASCII_0 + 1 + (squares[(pieceBuffer >> 4)] & 0xf) ); // extract rank from squares
             strncat(moveString, charBuffer, 1); // add numeric component
 
         };
@@ -266,7 +278,12 @@ void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
 void printLogicalBoard(uint8_t logical[BOARD_SIZE]) {
     for (int8_t rank = BOARD_SIZE-1; rank >= 0; rank--) { //start at the borrom because we need to print black first
         for (int8_t file = 0; file < BOARD_SIZE; file++){
-            printf("%d ", (logical[rank] >> file) & 1);
+            // printf("%d ", (logical[rank] >> file) & 1);
+            if ((logical[rank] >> file) & 1){
+                printf("x ");
+            } else {
+                printf(". ");
+            }
         };
         printf("\n");
     };
