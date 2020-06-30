@@ -99,8 +99,11 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
 void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]);
 void printLogicalBoard(uint8_t logical[BOARD_SIZE]);
 
+const char *PIECE_ID = "KKQBNR-P"; //global access to the letters for each piece
+
 int main(int argc, char *argv[]){
     board();
+    printf("\n");
     return 0;
 };
 
@@ -139,7 +142,8 @@ void board(void) {
 
     static uint8_t stateChangeTest[8] = {
         // 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0 //should be 1...a7
-        0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //should be 1.Na3
+        // 0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //should be 1.Na3
+        0x10, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //not allowed move, is technicaly 1.Ka3
     };
 
     printFullBoard(full);
@@ -181,9 +185,9 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
                     //..............|...........|______________________________ get the piece id and shift to LSBs
                     //...............\_________________________________________ MSB set high for piece id
 
-                    printf("Piece %x at %c%c (%d,%d)\n", pieces[found]&0xf, ASCII_a+file, ASCII_0+rank+1,rank,file);
+                    // printf("Piece %x at %c%c (%d,%d)\n", pieces[found]&0xf, ASCII_a+file, ASCII_0+rank+1,rank,file); //DEBUG
                 } else {
-                    printf("Empty at %c%c (%d,%d)\n", ASCII_a+file, ASCII_0+rank+1,rank,file);
+                    // printf("Empty at %c%c (%d,%d)\n", ASCII_a+file, ASCII_0+rank+1,rank,file); //DEBUG
                 }
                 found++;
             };
@@ -207,42 +211,13 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
                 pieceBuffer = (pieces[1] & 0xf) | 1<<4; //same as above, but the index placed in MSBs is nonzero
             };
     // 5. form a move made
-            switch (pieceBuffer & 0xf) { //piece id stored in 4 LSBs
-                case PAWN:
-                    printf("Pawn move from %c%c\n", ASCII_a + (squares[pieceBuffer >> 4]>>4), ASCII_0 + 1 + (squares[(pieceBuffer >> 4)]&0xf));
-                    /*//Nothing gets added for a pawn move, but this code is needed for pawn captures
-                    snprintf(charBuffer, 1, "%d", ASCII_a + squares[1 - (pieceBuffer >> 4)]);
-                    strncpy(moveString, charBuffer, 1); //1-x selects the other piece (since there's
-                    // ... only 2 pieces maximum in this case), then extracts the index and used that to get the file (>>4 for MSBs)
-                    */
-                    // strncpy(moveString, "", 1);
-                break;
-                case ROOK:
-                    //!!!TODO check for conflicts here to see if specifying which piece is needed
-                    strncpy(moveString, "R", 1);
-                break;
-                case KNIGHT:
-                    printf("Knight move from %c%c\n", ASCII_a + (squares[pieceBuffer >> 4]>>4), ASCII_0 + 1 + (squares[(pieceBuffer >> 4)]&0xf));
-                    //!!!TODO check for conflicts here to see if specifying which piece is needed
-                    strncpy(moveString, "N", 1);
-                break;
-                case BISHOP:
-                    strncpy(moveString, "B", 1);
-                break;
-                case QUEEN:
-                    //!!!TODO check for conflicts here to see if specifying which piece is needed
-                    strncpy(moveString, "Q", 1);
-                break;
-                case KING:
-                case CASTLED_KING:
-                    strncpy(moveString, "K", 1);
-                break;
-            };
+            strncpy(moveString, &PIECE_ID[pieceBuffer & 0xf], 1);
 
-            *charBuffer = (char)(ASCII_a + (squares[pieceBuffer >> 4] >> 4)); //extract the file from squares
+            *charBuffer = (char)(ASCII_a + (squares[1 - (pieceBuffer >> 4)] >> 4)); //extract file of the EMPTY square...
+            // ... by using squares[1-x] which is guarenteed to return the other piece because we only have two peices atm
             strncat(moveString, charBuffer, 1);// add alpha component
-            *charBuffer = (char)(ASCII_0 + 1 + (squares[(pieceBuffer >> 4)] & 0xf));
-            strncat(moveString, charBuffer, 1);
+            *charBuffer = (char)(ASCII_0 + 1 + (squares[1 - (pieceBuffer >> 4)] & 0xf)); //extract rank of empty square
+            strncat(moveString, charBuffer, 1);// add numeric component
         };
     };
 
@@ -251,15 +226,15 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
 
 
 void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
-    char *white = "KKQBNR-P"; //chars based on the 3-bit piece identifier specified above
-    char *black = "kkqbnr-p";
+    // char *white = "KKQBNR-P"; //chars based on the 3-bit piece identifier specified above
+    // char *black = "kkqbnr-p";
     for (int8_t rank = BOARD_SIZE-1; rank >= 0; rank--) { //start at the borrom because we need to print black first
         for (int8_t file = 0; file < BOARD_SIZE; file++){
             if (board[rank][file] & PIECE) {
                 if (board[rank][file] & BLACK) {
-                    printf("%c ", black[(board[rank][file] & M_PIECE) >> 1] );
+                    printf("%c ", PIECE_ID[(board[rank][file] & M_PIECE) >> 1] + 32);
                 } else {
-                    printf("%c ", white[(board[rank][file] & M_PIECE) >> 1] );
+                    printf("%c ", PIECE_ID[(board[rank][file] & M_PIECE) >> 1] );
                 }
             } else {
                 printf(". ");
