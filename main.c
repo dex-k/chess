@@ -191,8 +191,10 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
     };
     // 4 LSBs store the piece type, 4 MSBs store the id of the square in squares[] array
     uint8_t pieceBuffer = 0;
-    char moveString[7+1] = ""; // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
-    char charBuffer[1+1] = ""; // general purpose buffer for handinling single characters
+
+    // ={} ensures bulk initialisation to NULL https://stackoverflow.com/a/60535875
+    char moveString[7+1] = {}; // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
+    char charBuffer[1+1] = {}; // general purpose buffer for handinling single characters
 
     // 2. verify that theres only 2
     if (found == 2) {
@@ -236,19 +238,11 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
                     strncpy(moveString, "K", 1);
                 break;
             };
-            if ( !strcmp(moveString, "") ) { //if empty i.e. pawn move made
-                printf("pawm move empty str\n");
-                snprintf(charBuffer, 1, "%c", ASCII_a + (squares[pieceBuffer >> 4] >> 4) ); // extract the file from squares
-                strncpy(moveString, charBuffer, 1);// add alpha component
-            } else {
-                printf("non empty movestring\n");
-                snprintf(charBuffer, 1, "%c", ASCII_a + (squares[pieceBuffer >> 4] >> 4) ); // extract the file from squares
-                strncat(moveString, charBuffer, 1);// add alpha component
-            }
-            // *charBuffer = 0;
-            snprintf(charBuffer, 1, "%c", ASCII_0 + 1 + (squares[(pieceBuffer >> 4)] & 0xf) ); // extract rank from squares
-            strncat(moveString, charBuffer, 1); // add numeric component
 
+            *charBuffer = (char)(ASCII_a + (squares[pieceBuffer >> 4] >> 4)); //extract the file from squares
+            strncat(moveString, charBuffer, 1);// add alpha component
+            *charBuffer = (char)(ASCII_0 + 1 + (squares[(pieceBuffer >> 4)] & 0xf));
+            strncat(moveString, charBuffer, 1);
         };
     };
 
@@ -257,7 +251,7 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
 
 
 void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
-    char *white = "KKQBNR-P";
+    char *white = "KKQBNR-P"; //chars based on the 3-bit piece identifier specified above
     char *black = "kkqbnr-p";
     for (int8_t rank = BOARD_SIZE-1; rank >= 0; rank--) { //start at the borrom because we need to print black first
         for (int8_t file = 0; file < BOARD_SIZE; file++){
