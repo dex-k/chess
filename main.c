@@ -1,6 +1,6 @@
 # include <stdio.h>
 # include <stdint.h>
-# include <string.h>
+// # include <string.h>
 
 # define M_PIECE 0b00001110 //bits which id piece type
 # define M_W_ATK 0b00100000 //flip bit specifying white attack
@@ -93,11 +93,35 @@
 
 # define EMPTY  0b00000000
 
-
+/**
+ * needs so be changed to better soln.
+ * currently, it just holds the board array to avoid it being a global variable.
+ */
 void board(void);
+
+/**
+ * takes in the initial board with piece descriptors, and the changes which have happened, and uses
+ * that info to figure out what move was made, and if the move was valid
+ */
 void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateChange[BOARD_SIZE]);
+
+/**
+ * takes in a board with piece descriptors and prints it using letters for pieces
+ */
 void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]);
+
+/**
+ * takes a logical board state (if there is or isn't pieces) and prints an 8x8 grid of ./x for each piece
+ */
 void printLogicalBoard(uint8_t logical[BOARD_SIZE]);
+
+/**
+ * dangerous function that appends a single character to the end of a string in place of the terminating 
+ * NUL character, and adds a terminating NUL after.
+ * 
+ * !!! assumes the string is big enough and makes no checks
+ */
+void strcat_c(char *str, char c);
 
 const char *PIECE_ID = "KKQBNR-P"; //global access to the letters for each piece
 
@@ -142,8 +166,8 @@ void board(void) {
 
     static uint8_t stateChangeTest[8] = {
         // 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0 //should be 1...a7
-        // 0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //should be 1.Na3
-        0x10, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //not allowed move, is technicaly 1.Ka3
+        0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //should be 1.Na3
+        // 0x10, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0 //not allowed move, is technicaly 1.Ka3
     };
 
     printFullBoard(full);
@@ -184,10 +208,6 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
                     pieces[found] = 1 << 7  | ( (contents & M_PIECE) >> 1 );
                     //..............|...........|______________________________ get the piece id and shift to LSBs
                     //...............\_________________________________________ MSB set high for piece id
-
-                    // printf("Piece %x at %c%c (%d,%d)\n", pieces[found]&0xf, ASCII_a+file, ASCII_0+rank+1,rank,file); //DEBUG
-                } else {
-                    // printf("Empty at %c%c (%d,%d)\n", ASCII_a+file, ASCII_0+rank+1,rank,file); //DEBUG
                 }
                 found++;
             };
@@ -198,7 +218,7 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
 
     // ={} ensures bulk initialisation to NULL https://stackoverflow.com/a/60535875
     char moveString[7+1] = {}; // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
-    char charBuffer[1+1] = {}; // general purpose buffer for handinling single characters
+    // char charBuffer[1+1] = {}; // general purpose buffer for handling single characters
 
     // 2. verify that theres only 2
     if (found == 2) {
@@ -211,13 +231,18 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
                 pieceBuffer = (pieces[1] & 0xf) | 1<<4; //same as above, but the index placed in MSBs is nonzero
             };
     // 5. form a move made
-            strncpy(moveString, &PIECE_ID[pieceBuffer & 0xf], 1);
+            if ( (pieceBuffer & 0xf) != PAWN) { //only but a piece identifier in if the move wasn't made by a pawn
+                // strncpy(moveString, &PIECE_ID[pieceBuffer & 0xf], 1);
+                *moveString = PIECE_ID[pieceBuffer & 0xf]; //since we're only setting the first character, guarenteed.
+            }
+            // *charBuffer = (char)(ASCII_a + (squares[1 - (pieceBuffer >> 4)] >> 4)); //extract file of the EMPTY square...
+            // // ... by using squares[1-x] which is guarenteed to return the other piece because we only have two peices atm
+            // strncat(moveString, charBuffer, 1);// add alpha component
+            strcat_c(moveString, (char)(ASCII_a + (squares[1 - (pieceBuffer >> 4)] >> 4)));
 
-            *charBuffer = (char)(ASCII_a + (squares[1 - (pieceBuffer >> 4)] >> 4)); //extract file of the EMPTY square...
-            // ... by using squares[1-x] which is guarenteed to return the other piece because we only have two peices atm
-            strncat(moveString, charBuffer, 1);// add alpha component
-            *charBuffer = (char)(ASCII_0 + 1 + (squares[1 - (pieceBuffer >> 4)] & 0xf)); //extract rank of empty square
-            strncat(moveString, charBuffer, 1);// add numeric component
+            // *charBuffer = (char)(ASCII_0 + 1 + (squares[1 - (pieceBuffer >> 4)] & 0xf)); //extract rank of empty square
+            // strncat(moveString, charBuffer, 1);// add numeric component
+            strcat_c(moveString, (char)(ASCII_0 + 1 + (squares[1 - (pieceBuffer >> 4)] & 0xf)));
         };
     };
 
@@ -226,8 +251,6 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
 
 
 void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
-    // char *white = "KKQBNR-P"; //chars based on the 3-bit piece identifier specified above
-    // char *black = "kkqbnr-p";
     for (int8_t rank = BOARD_SIZE-1; rank >= 0; rank--) { //start at the borrom because we need to print black first
         for (int8_t file = 0; file < BOARD_SIZE; file++){
             if (board[rank][file] & PIECE) {
@@ -242,6 +265,7 @@ void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
         };
         printf("\n");
     };
+    printf("\n");
 }
 
 void printLogicalBoard(uint8_t logical[BOARD_SIZE]) {
@@ -256,4 +280,12 @@ void printLogicalBoard(uint8_t logical[BOARD_SIZE]) {
         };
         printf("\n");
     };
+    printf("\n");
+}
+
+void strcat_c(char *str, char c) {
+    //loop through the string incrementing pointer until we find the NUL
+    for (;*str;str++); // note the terminating semicolon here. 
+    *str++ = c; //append char
+    *str++ = '\0'; //append NUL
 }
