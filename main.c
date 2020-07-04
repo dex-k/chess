@@ -10,6 +10,7 @@
 # define ASCII_A 65
 # define ASCII_a 97
 # define ASCII_0 48
+# define MAX_MOV_LEN 7 // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
 
 /**
  * Types of chess pieces:
@@ -99,7 +100,49 @@ void printLogicalBoard(uint8_t logical[BOARD_SIZE]);
  */
 void strcat_c(char *str, char c);
 
+/**
+ * take a board and squares from and to to deduce if the given move is valid
+ * 0 = valid, -1 = invalid
+ */
+int8_t checkMoveValidity(uint8_t board[BOARD_SIZE][BOARD_SIZE], char moveString[MAX_MOV_LEN+1]);
+
+/**
+ * update the board array to reflect the given move, returning 0 on success or -1 if the move
+ * is invalid.
+ * 
+ * will update square values such as: attacked by white/black, king in check, ability to castle etc.
+ */
+int8_t makeMove(uint8_t board[BOARD_SIZE][BOARD_SIZE], char moveString[MAX_MOV_LEN+1]);
+
+
 const char *PIECE_ID = "KKQBNR-P"; //global access to the letters for each piece
+
+//4 wasted bits
+typedef struct Castling {
+    uint8_t K : 1; //white kingside
+    uint8_t Q : 1; //white queenside
+    uint8_t k : 1; //black kingside
+    uint8_t q : 1; //black queenside
+} Castling;
+
+//2 wasted bits
+typedef struct Square {
+    uint8_t r : 3; //rank 0 = 1st ... 111 = 7 = 8th
+    uint8_t f : 3; //file 0 = a file ... 111 = 7 = h file
+} Square;
+
+//to replace the 1 byte piece id with manual masking
+typedef struct Piece {
+    uint8_t isEmpty : 1; 
+    uint8_t type : 3;
+} Piece;
+
+typedef struct ChessBoard {
+    uint8_t full[BOARD_SIZE][BOARD_SIZE];
+    uint8_t logical[BOARD_SIZE];
+    uint8_t nextMove : 1; //0 = white, 1 = black
+    Castling castling; //KQkq availability
+} ChessBoard;
 
 int main(int argc, char *argv[]){
     board();
@@ -201,7 +244,7 @@ void getMove(uint8_t boardState[BOARD_SIZE][BOARD_SIZE], uint8_t logicalStateCha
     uint8_t pieceBuffer = 0;
 
     // ={} ensures bulk initialisation to NULL https://stackoverflow.com/a/60535875
-    char moveString[7+1] = {}; // "Qh1xg2+" is a longest possible move, assuming no !/?? type commentary
+    char moveString[MAX_MOV_LEN+1] = {}; 
 
     /**
      * if theres only 2 squares, the move was either a normal move or capture
@@ -253,9 +296,9 @@ void printFullBoard(uint8_t board[BOARD_SIZE][BOARD_SIZE]){
                 printf(". ");
             }
         };
-        printf("\n");
+        printf("\n"); //line break
     };
-    printf("\n");
+    printf("\n"); //trailing newline
 }
 
 void printLogicalBoard(uint8_t logical[BOARD_SIZE]) {
